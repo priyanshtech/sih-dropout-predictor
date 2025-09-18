@@ -1,0 +1,15 @@
+# Environments
+.venv
+venv/
+sih_final/
+
+# Database
+students.db
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE / OS files
+.vscode/
+.DS_Store
