@@ -1,32 +1,3 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const loginForm = document.getElementById('login-form');
-    const usernameInput = document.getElementById('username');
-    const passwordInput = document.getElementById('password');
-    const errorMessageDiv = document.getElementById('error-message');
-    
-    // --- FINAL: Your Live Backend URL ---
+document.addEventListener('DOMContentLoaded',()=>{
     const API_BASE_URL = 'https://sih-dropout-predictor.onrender.com';
-
-    loginForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        errorMessageDiv.textContent = '';
-        const username = usernameInput.value;
-        const password = passwordInput.value;
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ username, password }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                window.location.href = '/frontend/index.html';
-            } else {
-                throw new Error(data.error || 'Login failed.');
-            }
-        } catch (error) {
-            errorMessageDiv.textContent = error.message;
-        }
-    });
-});
+    const loginForm=document.getElementById("login-form"),usernameInput=document.getElementById("username"),passwordInput=document.getElementById("password"),errorMessageDiv=document.getElementById("error-message");loginForm.addEventListener("submit",async e=>{e.preventDefault(),errorMessageDiv.textContent="";const t=usernameInput.value,o=passwordInput.value;try{const e=await fetch(`${API_BASE_URL}/api/login`,{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({username:t,password:o})}),s=await e.json();if(e.ok)window.location.href="/frontend/index.html";else throw new Error(s.error||"Login failed.")}catch(e){errorMessageDiv.textContent=e.message}})});
