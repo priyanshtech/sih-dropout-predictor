@@ -1,23 +1,20 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    const API_BASE_URL = 'https://sih-dropout-predictor.onrender.com';
-    const listDiv = document.getElementById('list');
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/students`, { credentials: 'include' });
-        if (response.status === 401) {
-            window.location.href = '/frontend/login.html';
-            return;
-        }
-        if (!response.ok) {
-            throw new Error('Failed to fetch student data');
-        }
-        const students = await response.json();
-        if (students.length === 0) {
-            listDiv.innerHTML = '<p>No students found in the database.</p>';
-        } else {
-            listDiv.innerHTML = '<ul>' + students.map(s => `<li>${s.name} - ${s.class} (${s.risk_level} Risk)</li>`).join('') + '</ul>';
-        }
-    } catch (error) {
-        listDiv.innerHTML = `<p style="color: red;">Error: Could not connect to backend. ${error.message}</p>`;
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    let allStudents = []; let selectedId = null; let currentUser = null; let noteTimer = null;
+    const ELS = { list: document.getElementById('list'), emptyList: document.getElementById('emptyList'), search: document.getElementById('search'), statTotal: document.getElementById('statTotal'), statHigh: document.getElementById('statHigh'), profile: document.getElementById('profile'), profileEmpty: document.getElementById('profileEmpty'), pAvatar: document.getElementById('pAvatar'), pName: document.getElementById('pName'), pMeta: document.getElementById('pMeta'), pRisk: document.getElementById('pRisk'), pAttendance: document.getElementById('pAttendance'), pGrades: document.getElementById('pGrades'), pRiskScore: document.getElementById('pRiskScore'), interventions: document.getElementById('interventions'), interventionForm: document.getElementById('intervention-form'), interventionType: document.getElementById('intervention-type'), notes: document.getElementById('notes'), uploadButton: document.getElementById('upload-button'), userTag: document.getElementById('user-tag'), logoutButton: document.getElementById('logout-button') };
+    const mapBackendData = (s) => ({ id: s.id, name: s.name, class: s.class, advisor: s.advisor, attendance: s.attendance, grades: s.average_grade, risk_score: s.risk_score, risk: s.risk_level });
+    const riskColor = r => ({ High: '#ef4444', Medium: '#f59e0b', Low: '#22c55e' }[r] || '#94a3b8');
+    async function apiGet(endpoint) { const response = await fetch(`http://127.0.0.1:5000${endpoint}`, { credentials: 'include' }); if (response.status === 401) window.location.href = '/frontend/login.html'; if (!response.ok) throw new Error(`API Error on ${endpoint}`); return response.json(); }
+    async function apiPost(endpoint, data) { const response = await fetch(`http://127.0.0.1:5000${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(data), }); if (response.status === 401) window.location.href = '/frontend/login.html'; if (!response.ok) throw new Error(`API POST Error on ${endpoint}`); return response.json(); }
+    function renderStats() { ELS.statTotal.textContent = allStudents.length; ELS.statHigh.textContent = allStudents.filter(s => s.risk === 'High').length; }
+    function renderList(filterQuery = '') { const items = allStudents.filter(s => s.name.toLowerCase().includes(filterQuery.toLowerCase())); ELS.list.innerHTML = ''; ELS.emptyList.classList.toggle('hidden', items.length === 0); items.forEach(s => { const card = document.createElement('button'); card.className = `w-full text-left rounded-xl bg-white/5 hover:bg-white/10 border p-3 ${selectedId === s.id ? 'border-brand-500' : 'border-white/10'}`; card.innerHTML = `<div class="flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:${riskColor(s.risk)}20;color:${riskColor(s.risk)}">🎓</div><div><div class="font-medium">${s.name}</div><div class="text-xs text-white/60">${s.class} • ${s.advisor}</div></div></div><div class="text-right"><div class="text-sm">${s.attendance}% Att</div><span class="px-2 py-0.5 rounded-md text-xs" style="background:${riskColor(s.risk)}20;color:${riskColor(s.risk)}">${s.risk}</span></div></div>`; card.addEventListener('click', () => openProfile(s.id)); ELS.list.appendChild(card); }); }
+    async function openProfile(id) { selectedId = id; renderList(ELS.search.value); const s = allStudents.find(x => x.id === id); if (!s) return; ELS.profileEmpty.classList.add('hidden'); ELS.profile.classList.remove('hidden'); ELS.pAvatar.style.background = `${riskColor(s.risk)}20`; ELS.pAvatar.style.color = riskColor(s.risk); ELS.pName.textContent = s.name; ELS.pMeta.textContent = `${s.class} • ${s.advisor}`; ELS.pRisk.textContent = s.risk; ELS.pRisk.style.background = `${riskColor(s.risk)}20`; ELS.pRisk.style.color = riskColor(s.risk); ELS.pAttendance.textContent = `${s.attendance}%`; ELS.pGrades.textContent = `${s.grades}%`; ELS.pRiskScore.textContent = `${s.risk_score}%`; const [interventions, notes] = await Promise.all([apiGet(`/api/students/${id}/interventions`), apiGet(`/api/students/${id}/notes`)]); renderInterventions(interventions); renderNotes(notes); }
+    function renderInterventions(items) { ELS.interventions.innerHTML = items.length ? items.map(item => `<div class="flex justify-between bg-white/5 rounded-lg px-3 py-2"><span class="truncate">${item.intervention_type}</span><span class="text-xs text-white/60">${new Date(item.log_date).toLocaleDateString()}</span></div>`).join('') : `<p class="text-white/60 text-xs py-2">No interventions logged.</p>`; }
+    function renderNotes(items) { const latestNote = items.sort((a, b) => new Date(b.log_date) - new Date(a.log_date))[0]; ELS.notes.value = latestNote ? latestNote.note_text : ''; }
+    function updateUserUI() { if (!currentUser) return; ELS.userTag.textContent = `${currentUser.username} (${currentUser.role})`; if (currentUser.role === 'admin') { ELS.uploadButton.style.display = 'block'; } }
+    ELS.search.addEventListener('input', e => renderList(e.target.value));
+    ELS.interventionForm.addEventListener('submit', async (e) => { e.preventDefault(); if (!selectedId) return; await apiPost(`/api/students/${selectedId}/interventions`, { intervention_type: ELS.interventionType.value }); const interventions = await apiGet(`/api/students/${selectedId}/interventions`); renderInterventions(interventions); });
+    ELS.notes.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = setTimeout(async () => { if (!selectedId || !ELS.notes.value.trim()) return; await apiPost(`/api/students/${selectedId}/notes`, { note_text: ELS.notes.value.trim() }); }, 800); });
+    ELS.logoutButton.addEventListener('click', async () => { await apiPost('/api/logout', {}); window.location.href = '/frontend/login.html'; });
+    async function init() { try { const status = await apiGet('/api/status'); currentUser = status.user; updateUserUI(); const backendStudents = await apiGet('/api/students'); allStudents = backendStudents.map(mapBackendData); renderList(); } catch (e) { if (!e.message.includes('401')) { console.error("Initialization failed:", e); ELS.profileEmpty.textContent = 'Could not connect to backend. Is it running?'; } } }
+    init();
 });
